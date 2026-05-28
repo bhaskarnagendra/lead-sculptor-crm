@@ -505,7 +505,7 @@ export const AuthBarrier: React.FC<{ children: React.ReactNode }> = ({ children 
                             <li><b>Easiest Bypass Checklist:</b> Click the <b>"Direct Access"</b> tab above and type your admin email to access the system instantly without any popup or network limits!</li>
                           </ul>
                           <div className="bg-indigo-100/50 p-2.5 rounded-xl border border-indigo-200/50 text-[10px] text-indigo-950 font-bold leading-relaxed">
-                            <b>Admin Direct Fallback:</b> Since you are the Administrator, click the <b>Direct Access</b> tab, enter <code className="bg-white px-1 text-slate-800 font-mono font-black rounded">bhaskarnagendra@gmail.com</code> with Password: <code className="bg-white px-1 text-slate-800 font-mono font-black rounded">12345</code> to enter securely.
+                            <b>Admin Direct Fallback:</b> Click the <b>Direct Access</b> tab and sign in using your designated Administrator or Sales Rep account to enter securely.
                           </div>
                           <button 
                             type="button"
@@ -575,8 +575,8 @@ export const AuthBarrier: React.FC<{ children: React.ReactNode }> = ({ children 
                         />
                       </div>
                    </div>
-                    <p className="text-[10px] text-slate-500 font-semibold leading-relaxed px-1 my-3 tracking-wide text-center">
-                      <b>Bypass Credentials:</b> Email <code className="bg-slate-100 px-1 rounded text-slate-800 font-bold select-all">bhaskarnagendra@gmail.com</code> or Name <code className="bg-slate-100 px-1 rounded text-slate-800 font-bold">Monish / Arpita</code> / Password: <code className="bg-slate-100 px-1 rounded text-slate-800 font-bold">12345</code>
+                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed px-1 my-3 tracking-wide text-center">
+                      Please enter your authorized email or Sales Rep name and password/token.
                     </p>
                    {error === 'ANONYMOUS_AUTH_DISABLED' ? (
                      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 space-y-3">
