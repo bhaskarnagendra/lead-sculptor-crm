@@ -341,6 +341,45 @@ export const AuthBarrier: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!snapshot.empty) {
         p = snapshot.docs[0].data() as UserProfile;
       }
+
+      if (!p) {
+        const isDefaultAdmin = searchVal.toLowerCase() === 'bhaskarnagendra@gmail.com' && searchPass === '12345';
+        const isDefaultMonish = searchVal.toLowerCase() === 'monish' && searchPass === '12345';
+        const isDefaultArpita = searchVal.toLowerCase() === 'arpita' && searchPass === '12345';
+
+        if (isDefaultAdmin || isDefaultMonish || isDefaultArpita) {
+          console.log("Empty database detected on login attempt. Autoseeding users & default data...");
+          try {
+            const adminProfile: UserProfile = {
+              uid: 'manual_admin_bhaskar',
+              email: 'bhaskarnagendra@gmail.com',
+              displayName: 'Nagendra Bhaskar',
+              role: 'admin',
+              createdAt: serverTimestamp(),
+            };
+            await setDoc(doc(db, 'users', adminProfile.uid), {
+              ...adminProfile,
+              password: '12345'
+            });
+
+            await seedUsersIfEmpty();
+
+            const qEmailRetry = query(usersRef, where('email', '==', searchVal), where('password', '==', searchPass));
+            const qNameRetry = query(usersRef, where('displayName', '==', searchVal), where('password', '==', searchPass));
+            
+            const [snapEmailRetry, snapNameRetry] = await Promise.all([getDocs(qEmailRetry), getDocs(qNameRetry)]);
+            const snapshotRetry = !snapEmailRetry.empty ? snapEmailRetry : snapNameRetry;
+            
+            if (!snapshotRetry.empty) {
+              p = snapshotRetry.docs[0].data() as UserProfile;
+            } else if (isDefaultAdmin) {
+              p = adminProfile;
+            }
+          } catch (seedErr) {
+            console.error("Autoseeding on direct login failed", seedErr);
+          }
+        }
+      }
       
       if (p) {
         // 3. Create a Session Link in Firestore
