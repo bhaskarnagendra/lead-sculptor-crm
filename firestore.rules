@@ -1,0 +1,147 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { 
+      return isSignedIn() && (
+        request.auth.uid == userId || 
+        (exists(/databases/$(database)/documents/sessions/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/sessions/$(request.auth.uid)).data.realUid == userId)
+      );
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    // Super Admin by email
+    function isSessionBhaskar() {
+      return exists(/databases/$(database)/documents/sessions/$(request.auth.uid)) &&
+             exists(/databases/$(database)/documents/users/$(get(/databases/$(database)/documents/sessions/$(request.auth.uid)).data.realUid)) &&
+             get(/databases/$(database)/documents/users/$(get(/databases/$(database)/documents/sessions/$(request.auth.uid)).data.realUid)).data.get('email', '') == 'bhaskarnagendra@gmail.com';
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        (request.auth.token != null && (request.auth.token.get('email', '') == 'bhaskarnagendra@gmail.com' || request.auth.token.email == 'bhaskarnagendra@gmail.com')) ||
+        isSessionBhaskar()
+      );
+    }
+
+    function isAdmin() { 
+      return isSignedIn() && (
+        isSuperAdmin() || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin') ||
+        (exists(/databases/$(database)/documents/sessions/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/sessions/$(request.auth.uid)).data.get('role', '') == 'admin')
+      );
+    }
+
+    function isSalesRep() { 
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'sales_rep') ||
+        (exists(/databases/$(database)/documents/sessions/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/sessions/$(request.auth.uid)).data.get('role', '') == 'sales_rep')
+      );
+    }
+
+    // 1. Sessions collection - MUST be at the top to ensure login flow works
+    match /sessions/{uid} {
+      allow get, list, write, delete: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // 2. Users collection - Publicly listable (by any signed in user) to allow Direct Login lookup
+    match /users/{userId} {
+      allow list, get: if isSignedIn(); 
+      allow create: if isAdmin() || (isSignedIn() && !exists(/databases/$(database)/documents/users/$(userId)));
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin() || isSuperAdmin();
+    }
+    
+    // Collection Group for FollowUps (Calendar query)
+    match /{path=**}/followups/{followupId} {
+      allow read: if isSalesRep();
+    }
+
+    // Leads collection
+    match /leads/{leadId} {
+      function isValidLead(data) {
+        return data.name is string && data.name.size() > 0 && data.name.size() < 256 &&
+               data.status in ['new', 'contacted', 'interested', 'enrolled', 'lost'] &&
+               (data.score == null || data.score is number) &&
+               (data.assignedTo == null || data.assignedTo is string);
+      }
+
+      allow get, list: if isSalesRep();
+      allow create: if isSalesRep() && isValidLead(incoming()); 
+      allow update: if isSalesRep() && isValidLead(incoming()) && incoming().updatedAt == request.time;
+      allow delete: if isAdmin();
+
+      // Subcollection: FollowUps
+      match /followups/{followupId} {
+        function isValidFollowUp(data) {
+          return data.leadId is string &&
+                 data.type in ['call', 'email', 'meeting', 'other'] &&
+                 data.status in ['pending', 'completed'];
+        }
+
+        allow list, get: if isSalesRep();
+        allow create: if isSalesRep() && isValidFollowUp(incoming()) && incoming().createdAt == request.time;
+        allow update: if isSalesRep() && isValidFollowUp(incoming());
+        allow delete: if isAdmin();
+      }
+    }
+    
+    // Settings for custom fields
+    match /settings/{settingId} {
+      allow read: if isSalesRep();
+      allow write: if isAdmin();
+    }
+
+    // Config parameters (e.g., assignment, lead_schema templates)
+    match /config/{configId} {
+      allow read: if isSalesRep();
+      allow write: if isSalesRep();
+    }
+
+    // Courses collection
+    match /courses/{courseId} {
+      function isValidCourse(data) {
+        return data.name is string && data.name.size() > 0 &&
+               data.duration is string &&
+               data.fees is number &&
+               (data.description == null || data.description is string);
+      }
+
+      allow list, get: if isSalesRep();
+      allow create: if isAdmin() && isValidCourse(incoming()) && incoming().createdAt == request.time;
+      allow update: if isAdmin() && isValidCourse(incoming());
+      allow delete: if isAdmin() || isSuperAdmin();
+    }
+
+    // Targets collection
+    match /targets/{targetId} {
+      function isValidTarget(data) {
+        return data.userId is string && data.userId.size() > 0 &&
+               data.month is string && data.month.matches('^[0-9]{4}-[0-9]{2}$') &&
+               data.target is number && data.target >= 0 &&
+               (data.userName == null || data.userName is string);
+      }
+
+      allow get: if isSalesRep() && isValidId(targetId);
+      allow list: if isSalesRep();
+      allow create: if isAdmin() && isValidId(targetId) && isValidTarget(incoming()) && incoming().createdAt == request.time;
+      allow update: if isAdmin() && isValidId(targetId) && isValidTarget(incoming()) && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(targetId);
+    }
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile for sales team members",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "sales_rep"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "Prospect lead information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "status": { "type": "string", "enum": ["new", "contacted", "interested", "enrolled", "lost"] },
+        "score": { "type": "number" },
+        "assignedTo": { "type": "string" },
+        "customFields": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "status"]
+    },
+    "FollowUp": {
+      "title": "Follow Up",
+      "description": "Scheduled or logged interaction with a lead",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "leadId": { "type": "string" },
+        "note": { "type": "string" },
+        "type": { "type": "string", "enum": ["call", "email", "meeting", "other"] },
+        "scheduledAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["leadId", "type", "status"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "Educational program information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "duration": { "type": "string" },
+        "fees": { "type": "number" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "duration", "fees"]
+    },
+    "Target": {
+      "title": "Monthly Target",
+      "description": "Monthly enrollment targets for sales representative",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "month": { "type": "string", "description": "YYYY-MM formatted month" },
+        "target": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "month", "target"]
+    }
+  },
+  "firestore": {
+    "/targets/{targetId}": {
+      "schema": "Target",
+      "description": "Monthly enrollment targets for team members"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Information about sales team members"
+    },
+    "/leads/{leadId}": {
+      "schema": "Lead",
+      "description": "Collection of leads"
+    },
+    "/leads/{leadId}/followups/{followUpId}": {
+      "schema": "FollowUp",
+      "description": "Follow-ups for a specific lead"
+    },
+    "/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Catalog of courses offered"
+    },
+    "/sessions/{uid}": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "realUid": { "type": "string" },
+          "role": { "type": "string" },
+          "displayName": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "description": "Active user sessions for direct login"
+    }
+  }
+}
