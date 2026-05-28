@@ -18,6 +18,7 @@ import { CalendarPage } from './components/CalendarPage';
 
 function MainLayout() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -33,11 +34,16 @@ function MainLayout() {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#F9FAFB]">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopHeader />
-        <main className="flex-1 overflow-auto relative">
+    <div className="flex h-screen w-full overflow-hidden bg-[#F9FAFB] relative">
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        isOpen={isSidebarOpen} 
+        onClose={() => setIsSidebarOpen(false)} 
+      />
+      <div className="flex-1 flex flex-col overflow-hidden w-full">
+        <TopHeader onMenuClick={() => setIsSidebarOpen(true)} />
+        <main className="flex-1 overflow-auto relative p-4 md:p-0">
           {renderContent()}
         </main>
       </div>

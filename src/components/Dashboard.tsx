@@ -489,141 +489,17 @@ export const Dashboard: React.FC = () => {
     });
   };
 
-  // Gamified Engine Calculations
-  const calculateGamifiedStats = () => {
-    const totalEnrolled = salespersonLeads.filter(l => l.status === 'enrolled').length;
-    
-    // XP Calculation Formulas
-    const enrollXP = totalEnrolled * 150;
-    const pipelineXP = activeStats.total * 15;
-    const scoreBonusXP = activeStats.avgScore * 4;
-    const revenueXP = Math.floor(activeStats.revenue / 1000);
-    
-    const totalXP = enrollXP + pipelineXP + scoreBonusXP + revenueXP || 0;
-    
-    const levelXPBracket = 400; // 400 XP per level
-    const currentLevel = Math.max(1, Math.floor(totalXP / levelXPBracket) + 1);
-    const xpIntoLevel = totalXP % levelXPBracket;
-    const xpProgressPercent = Math.min(Math.round((xpIntoLevel / levelXPBracket) * 100), 100);
-
-    const titles = [
-      "Bronze Prospector",       // Level 1
-      "Silver Dial Master",      // Level 2
-      "Gold Lead Closer",        // Level 3
-      "Platinum Dealmaker",      // Level 4
-      "Diamond Sales Elite",     // Level 5
-      "Supreme Closer Legend"    // Level 6+
-    ];
-    const currentTitle = titles[Math.min(currentLevel - 1, titles.length - 1)];
-
-    // Badges / Achievements
-    const achievements = [
-      {
-        id: 'first_deal',
-        name: 'First Blood',
-        desc: 'Mark at least 1 lead as Enrolled',
-        unlocked: totalEnrolled >= 1,
-        xpBonus: '+150 XP',
-        icon: Trophy,
-        color: 'text-amber-500 bg-amber-50 border-amber-200'
-      },
-      {
-        id: 'revenue_giant',
-        name: 'Revenue Titan',
-        desc: 'Generate over ₹1,00,000 in student course fees',
-        unlocked: activeStats.revenue >= 100000,
-        xpBonus: '+300 XP',
-        icon: Crown,
-        color: 'text-purple-500 bg-purple-50 border-purple-200'
-      },
-      {
-        id: 'efficiency_master',
-        name: 'Closer Pro',
-        desc: 'Conversion rate above 20% (min 5 leads)',
-        unlocked: activeStats.total >= 5 && (totalEnrolled / activeStats.total) >= 0.2,
-        xpBonus: '+200 XP',
-        icon: Flame,
-        color: 'text-rose-500 bg-rose-50 border-rose-200'
-      },
-      {
-        id: 'pipeline_builder',
-        name: 'Funnel Mastermind',
-        desc: 'Register 10+ inquiry records in your pipeline',
-        unlocked: activeStats.total >= 10,
-        xpBonus: '+100 XP',
-        icon: Star,
-        color: 'text-sky-500 bg-sky-50 border-sky-200'
-      }
-    ];
-
-    // Missions / Quests
-    const dailyTasksList = sortTasksByPriority(getDailyTasks());
-    const quests = [
-      {
-        id: 'quest_clean_tasks',
-        name: 'Clear Today\'s Priority Board',
-        desc: 'Process and complete all scheduled callbacks for today',
-        status: dailyTasksList.length === 0 ? 'COMPLETED' : `${dailyTasksList.length} Left`,
-        done: dailyTasksList.length === 0,
-        xp: 100
-      },
-      {
-        id: 'quest_high_score',
-        name: 'High Scoring Target Focus',
-        desc: 'Close a deal with a high-score prospect (Score >= 80)',
-        status: salespersonLeads.some(l => l.status === 'enrolled' && l.score >= 80) ? 'COMPLETED' : 'Pending',
-        done: salespersonLeads.some(l => l.status === 'enrolled' && l.score >= 80),
-        xp: 150
-      },
-      {
-        id: 'quest_daily_yield',
-        name: 'Daily Elite Yield Target',
-        desc: 'Achieve at least 1 closed enrollment with value above ₹30,000',
-        status: salespersonLeads.some(l => {
-          if (l.status !== 'enrolled') return false;
-          const course = courses.find(c => c.id === l.courseId || c.name === l.courseName);
-          const fee = Math.max(0, (course?.fees || 0) - (l.discount || 0));
-          return fee >= 30000;
-        }) ? 'COMPLETED' : 'Pending',
-        done: salespersonLeads.some(l => {
-          if (l.status !== 'enrolled') return false;
-          const course = courses.find(c => c.id === l.courseId || c.name === l.courseName);
-          const fee = Math.max(0, (course?.fees || 0) - (l.discount || 0));
-          return fee >= 30000;
-        }),
-        xp: 120
-      }
-    ];
-
-    // Dynamic streak score - mock tracker based on active performance
-    const activeStreakCount = Math.max(1, Math.min(10, Math.floor(activeStats.revenue / 25000) + totalEnrolled));
-
-    return {
-      totalXP,
-      currentLevel,
-      xpIntoLevel,
-      levelXPBracket,
-      xpProgressPercent,
-      currentTitle,
-      achievements,
-      quests,
-      activeStreakCount
-    };
-  };
-
-  const gamified = calculateGamifiedStats();
-
   const StatCard = ({ label, value, subText, icon: Icon, colorClass = "text-[#1D1D1F] bg-[#F5F5F7]" }: any) => (
-    <div className="bento-card p-6 flex flex-col justify-between h-full group hover:translate-y-[-2px] transition-all duration-300">
+    <div className="bento-card p-6 flex flex-col justify-between h-full group hover:translate-y-[-2px] transition-all duration-300 border border-slate-200 shadow-xs">
       <div className="flex justify-between items-start mb-4">
         <div className={`p-2.5 rounded-xl transition-colors ${colorClass}`}>
-          <Icon size={18} strokeWidth={2.5} />
+          <Icon size={18} strokeWidth={2.2} />
         </div>
       </div>
       <div>
         <h3 className="text-3xl font-bold tracking-tight text-[#1D1D1F] mb-1">{value}</h3>
-        <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">{label}</p>
-        {subText && <p className="text-[11px] text-slate-500 font-medium mt-1">{subText}</p>}
+        <p className="text-xs font-bold uppercase text-slate-500 tracking-wider">{label}</p>
+        {subText && <p className="text-sm text-slate-500 font-medium mt-1.5">{subText}</p>}
       </div>
     </div>
   );
@@ -669,176 +545,7 @@ export const Dashboard: React.FC = () => {
         </div>
       </header>
 
-      {/* SALES GAMIFIED ARENA & PROGRESS (RIGHT ON TOP FOR SALES LOGIN) */}
-      {!isAdmin && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* XP & LEVEL MODULE */}
-          <div className="bento-card p-6 bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 text-white rounded-[32px] border-none shadow-xl flex flex-col justify-between relative overflow-hidden group">
-            {/* Ambient Background Glows */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-indigo-500/20 transition-all duration-700" />
-            <div className="absolute -bottom-8 -left-8 w-40 h-40 bg-pink-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-pink-500/20 transition-all duration-700" />
 
-            <div>
-              {/* Header */}
-              <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-2">
-                  <div className="bg-white/10 p-2 rounded-xl border border-white/10 shrink-0">
-                    <Crown className="w-5 h-5 text-amber-400 animate-bounce" />
-                  </div>
-                  <div>
-                    <h2 className="text-[10px] font-black uppercase text-indigo-300 tracking-widest leading-none">Sales Representative Arena</h2>
-                    <p className="text-sm font-bold text-white mt-1">Gladiator Standings</p>
-                  </div>
-                </div>
-                {/* Level Badge */}
-                <div className="bg-amber-400 text-slate-950 text-xs font-black px-3 py-1 rounded-full shadow-md flex items-center gap-1">
-                  <span>LVL {gamified.currentLevel}</span>
-                </div>
-              </div>
-
-              {/* Title & Rank Descriptor */}
-              <div className="mb-6">
-                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-300">Current Rank Title</span>
-                <h3 className="text-2xl font-black text-white tracking-tight mt-0.5 drop-shadow-sm">{gamified.currentTitle}</h3>
-                <p className="text-[11px] text-indigo-100/70 font-medium mt-1">Earn experience points (XP) to unlock higher tiers and supreme status.</p>
-              </div>
-            </div>
-
-            {/* Progress indicator */}
-            <div>
-              <div className="flex justify-between items-end mb-2 text-xs font-bold">
-                <span className="text-indigo-200">Level Progress</span>
-                <span className="font-mono text-white">{gamified.xpIntoLevel} / {gamified.levelXPBracket} XP</span>
-              </div>
-              
-              <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-amber-400 via-pink-500 to-indigo-400 rounded-full transition-all duration-1000 shadow-[0_0_12px_rgba(251,191,36,0.3)]"
-                  style={{ width: `${gamified.xpProgressPercent}%` }}
-                />
-              </div>
-
-              <div className="flex justify-between items-center mt-3 text-[9px] font-bold text-indigo-200 uppercase tracking-widest">
-                <span>{gamified.xpProgressPercent}% Accomplished</span>
-                <span className="bg-white/5 border border-white/10 px-2 py-0.5 rounded-md flex items-center gap-1 font-mono text-white font-black">
-                  <Zap size={9} className="text-amber-400 fill-amber-400 text-[10px]" />
-                  Total {gamified.totalXP} XP
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* DAILY MISSIONS / QUESTS */}
-          <div className="bento-card p-6 bg-white border border-slate-200/60 rounded-[32px] shadow-sm flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="bg-[#FFF9E6] p-1.5 rounded-lg border border-amber-100 text-amber-500">
-                  <Compass size={16} />
-                </div>
-                <div>
-                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Active Daily Campaigns</h3>
-                  <p className="text-[10px] text-slate-400 font-bold">Clear missions to secure immediate XP rewards</p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {gamified.quests.map((quest) => (
-                  <div 
-                    key={quest.id} 
-                    className={`p-3 rounded-2xl border transition-all flex items-start gap-3 relative ${
-                      quest.done 
-                        ? 'bg-emerald-50/50 border-emerald-100 text-slate-500' 
-                        : 'bg-slate-50/50 border-slate-100 hover:border-slate-250'
-                    }`}
-                  >
-                    {/* Status checkbox */}
-                    <div className={`mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                      quest.done 
-                        ? 'bg-emerald-500 border-emerald-500 text-white' 
-                        : 'bg-white border-slate-300'
-                    }`}>
-                      {quest.done && <Check size={10} strokeWidth={3} />}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-baseline gap-2">
-                        <h4 className={`text-[11px] font-black truncate leading-none ${quest.done ? 'line-through text-slate-400' : 'text-slate-850'}`}>
-                          {quest.name}
-                        </h4>
-                        <span className="text-[9px] font-mono font-black text-indigo-500 shrink-0 bg-indigo-50/80 px-1.5 py-0.5 rounded">
-                          +{quest.xp} XP
-                        </span>
-                      </div>
-                      <p className="text-[9px] text-slate-400 font-medium mt-1 leading-relaxed">
-                        {quest.desc}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* REWARDS & BADGES COMPLETED */}
-          <div className="bento-card p-6 bg-white border border-slate-200/60 rounded-[32px] shadow-sm flex flex-col justify-between">
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="bg-rose-50 p-1.5 rounded-lg border border-rose-100 text-rose-500">
-                    <Trophy size={16} />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Honorary achievements</h3>
-                    <p className="text-[10px] text-slate-400 font-bold">Your unlocked corporate milestones</p>
-                  </div>
-                </div>
-
-                {/* Streak Multiplier */}
-                <div className="bg-orange-50 border border-orange-100 px-3 py-1 rounded-full flex items-center gap-1 shadow-xs shrink-0">
-                  <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500" />
-                  <span className="text-[10px] font-black text-orange-600">{gamified.activeStreakCount}x STREAK</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                {gamified.achievements.map((ach) => {
-                  const AchIcon = ach.icon;
-                  return (
-                    <div 
-                      key={ach.id} 
-                      className={`p-3 rounded-2xl border transition-all flex flex-col justify-between gap-2.5 group/ach relative overflow-hidden ${
-                        ach.unlocked 
-                          ? 'bg-slate-50 border-slate-200 shadow-xs' 
-                          : 'bg-slate-50/20 border-slate-100 opacity-45 grayscale'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-1">
-                        <div className={`p-1.5 rounded-xl shrink-0 ${ach.unlocked ? ach.color : 'bg-slate-200 text-slate-400'}`}>
-                          <AchIcon size={14} />
-                        </div>
-                        {ach.unlocked && (
-                          <span className="text-[8px] font-black text-emerald-600 border border-emerald-100 bg-emerald-50 px-1 py-0.5 rounded">
-                            UNLOCKED
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div>
-                        <h4 className="text-[10px] font-black text-slate-800 truncate leading-none">
-                          {ach.name}
-                        </h4>
-                        <p className="text-[8px] text-slate-400 font-medium mt-1 leading-normal line-clamp-2">
-                          {ach.desc}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* SALES DAILY TASKS PRIORITY BOARD (RIGHT ON TOP FOR SALES LOGIN) */}
       {!isAdmin && (
@@ -850,10 +557,10 @@ export const Dashboard: React.FC = () => {
                   <Clock className="w-5 h-5 text-rose-500 animate-pulse-subtle" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black uppercase tracking-widest text-slate-800">
+                  <h2 className="text-base font-bold uppercase tracking-wide text-slate-800">
                     Today's Task Priorities & Action Plan
                   </h2>
-                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                  <p className="text-sm text-slate-550 font-medium mt-1">
                     Prioritized automatically by critical action type to maximize closed enrollments.
                   </p>
                 </div>
@@ -861,18 +568,18 @@ export const Dashboard: React.FC = () => {
             </div>
             
             {/* Priority Legend */}
-            <div className="flex flex-wrap items-center gap-3 text-[10px] font-bold text-slate-400">
+            <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-slate-500">
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-rose-500"></span> Red: Meetings
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Red: Meetings
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-amber-500"></span> Orange: Calls
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Orange: Calls
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-indigo-500"></span> Blue: Emails
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span> Blue: Emails
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-slate-400"></span> Gray: Other
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span> Gray: Other
               </span>
             </div>
           </div>
@@ -885,8 +592,8 @@ export const Dashboard: React.FC = () => {
                return (
                 <div className="py-10 text-center flex flex-col items-center justify-center text-slate-400 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
                   <Check className="w-8 h-8 text-emerald-500 mb-2 bg-emerald-50 p-1.5 rounded-full" />
-                  <span className="text-xs font-black uppercase tracking-wider text-slate-700">All caught up!</span>
-                  <p className="text-[11px] text-slate-400 mt-0.5">You have completed all follow-ups scheduled for today. Great job!</p>
+                  <span className="text-sm font-black uppercase tracking-wider text-slate-700">All caught up!</span>
+                  <p className="text-xs text-slate-400 mt-1">You have completed all follow-ups scheduled for today. Great job!</p>
                 </div>
               );
             }
@@ -904,31 +611,31 @@ export const Dashboard: React.FC = () => {
                   let priorityLabel = "Priority 4 (Normal)";
                   let TaskIcon = Clock;
                   let priorityColor = "text-slate-500";
-
+ 
                   if (isMeeting) {
                     themeClass = "border-l-[4px] border-l-[#F43F5E] border-t border-r border-b border-rose-200/50 bg-[#FCF5F5] hover:bg-[#FDF7F7] shadow-[0_2px_8px_rgba(244,63,94,0.01)]";
                     iconBg = "bg-rose-100 text-[#F43F5E]";
                     priorityLabel = "Priority 1 (High)";
-                    priorityColor = "text-rose-500";
+                    priorityColor = "text-rose-600";
                     TaskIcon = Video;
                   } else if (isCall) {
                     themeClass = "border-l-[4px] border-l-amber-500 border-t border-r border-b border-amber-200/40 bg-[#FCF9F2] hover:bg-[#FDFBF7] shadow-[0_2px_8px_rgba(245,158,11,0.01)]";
                     iconBg = "bg-[#FEF6E5] text-amber-600";
                     priorityLabel = "Priority 2 (Medium-High)";
-                    priorityColor = "text-amber-700";
+                    priorityColor = "text-amber-850";
                     TaskIcon = PhoneCall;
                   } else if (isEmail) {
                     themeClass = "border-l-[4px] border-l-indigo-500 border-t border-r border-b border-indigo-200/40 bg-[#F5F7FC] hover:bg-[#F8FAFC] shadow-[0_2px_8px_rgba(99,102,241,0.01)]";
                     iconBg = "bg-indigo-100 text-indigo-600";
                     priorityLabel = "Priority 3 (Medium)";
-                    priorityColor = "text-indigo-600";
+                    priorityColor = "text-indigo-700";
                     TaskIcon = Mail;
                   }
-
+ 
                   // Determine if overdue
                   const schedTime = task.scheduledAt?.toDate ? task.scheduledAt.toDate() : new Date(task.scheduledAt);
                   const isOverdue = schedTime < new Date() && (new Date().getTime() - schedTime.getTime() > 15 * 60 * 1000);
-
+ 
                   return (
                     <div 
                       key={task.id} 
@@ -937,51 +644,51 @@ export const Dashboard: React.FC = () => {
                       <div>
                         {/* Task Header: Priority description & Schedule badge */}
                         <div className="flex justify-between items-center mb-2">
-                          <span className={`text-[9px] font-black uppercase tracking-widest ${priorityColor}`}>
+                          <span className={`text-xs font-bold uppercase tracking-widest ${priorityColor}`}>
                             {priorityLabel}
                           </span>
                           
                           <div className="flex items-center gap-1.5">
                             {isOverdue && (
-                              <span className="bg-rose-500 text-white rounded-md text-[8px] font-black tracking-widest px-1.5 py-0.5 leading-none shadow-xs">
+                              <span className="bg-rose-500 text-white rounded-md text-[10px] font-bold tracking-wider px-2 py-0.5 leading-none shadow-xs">
                                 OVERDUE
                               </span>
                             )}
-                            <span className="text-[10px] font-black bg-white px-2.5 py-1 rounded-md shadow-3xs flex items-center gap-1 text-slate-700 border border-slate-100">
-                              <Clock size={10} className="text-slate-500" />
+                            <span className="text-xs font-bold bg-white px-3 py-1.5 rounded-lg shadow-3xs flex items-center gap-1.5 text-slate-750 border border-slate-150">
+                              <Clock size={12} className="text-slate-550" />
                               {schedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
                             </span>
                           </div>
                         </div>
-
+ 
                         {/* Customer title */}
                         <div className="flex items-center gap-3 mt-1.5">
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${iconBg}`}>
                             <TaskIcon size={16} strokeWidth={2.5} />
                           </div>
                           <div className="truncate">
-                            <h4 className="text-sm font-black text-[#1D1D1F] leading-tight truncate">
+                            <h4 className="text-base font-bold text-[#1D1D1F] leading-tight truncate">
                               {task.leadName || 'Unnamed Prospect'}
                             </h4>
-                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                            <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mt-1">
                               Action: {task.type}
                             </p>
                           </div>
                         </div>
-
+ 
                         {/* Action details */}
-                        <p className="text-[11px] font-medium text-slate-600 mt-3 pl-1 leading-relaxed bg-white/70 px-3 py-2.5 rounded-2xl border border-slate-100/55 min-h-[50px] flex items-center">
+                        <p className="text-sm font-medium text-slate-650 mt-4 pl-1 leading-relaxed bg-white/70 px-4 py-3 rounded-2xl border border-slate-200/60 min-h-[50px] flex items-center">
                           {task.note || 'No administrative instructions recorded.'}
                         </p>
                       </div>
-
+ 
                       {/* Immediate Check-Off and Contact Button */}
                       <div className="flex items-center gap-2 pt-2 border-t border-slate-200/30 mt-1">
                         <button
                           onClick={() => handleCompleteTask(task)}
-                          className="flex-1 py-3 bg-emerald-600 text-white hover:bg-emerald-500 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-700/5 hover:-translate-y-px transition-all cursor-pointer"
+                          className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 font-bold text-white rounded-full text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-700/5 hover:-translate-y-px transition-all cursor-pointer"
                         >
-                          <Check size={12} strokeWidth={3} />
+                          <Check size={14} strokeWidth={3} />
                           Complete
                         </button>
                         
@@ -1014,7 +721,7 @@ export const Dashboard: React.FC = () => {
 
       {/* INTERACTIVE ANALYTICS DRILL-DOWN PANEL */}
       <div className="bento-card p-6 border border-slate-200/60 bg-white shadow-sm rounded-2xl">
-        <div className="flex items-center gap-2 mb-4 text-xs font-semibold text-[#1D1D1F] tracking-wide">
+        <div className="flex items-center gap-2 mb-4 text-sm font-semibold text-[#1D1D1F] tracking-wide">
           <Filter className="w-4 h-4 text-indigo-500" />
           <span>Interactive Scope Filters</span>
         </div>
@@ -1023,13 +730,13 @@ export const Dashboard: React.FC = () => {
           
           {/* Timeframe Interval Selector */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Time Resolution</label>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Time Resolution</label>
             <div className="flex rounded-xl bg-slate-100 p-1 w-full">
               {(['day', 'month', 'year', 'all'] as TimeframeType[]).map((tf) => (
                 <button
                   key={tf}
                   onClick={() => setTimeframe(tf)}
-                  className={`flex-1 text-[11px] font-extrabold uppercase py-1.5 rounded-lg transition-all cursor-pointer text-center ${
+                  className={`flex-1 text-xs font-bold uppercase py-2 rounded-lg transition-all cursor-pointer text-center ${
                     timeframe === tf
                       ? 'bg-white text-indigo-600 shadow-sm'
                       : 'text-slate-400 hover:text-slate-600'
@@ -1043,7 +750,7 @@ export const Dashboard: React.FC = () => {
 
           {/* Specific Timepicker based on resolution */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Selected Period</label>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Selected Period</label>
             <div>
               {timeframe === 'day' && (
                 <input
@@ -1068,8 +775,8 @@ export const Dashboard: React.FC = () => {
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-[#1D1D1F] outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                 >
                   {Array.from({ length: 5 }).map((_, i) => {
-                    const yr = String(new Date().getFullYear() - i);
-                    return <option key={yr} value={yr}>{yr} Calendar Year</option>;
+                     const yr = String(new Date().getFullYear() - i);
+                     return <option key={yr} value={yr}>{yr} Calendar Year</option>;
                   })}
                 </select>
               )}
@@ -1083,7 +790,7 @@ export const Dashboard: React.FC = () => {
 
           {/* Salesperson Selector */}
           <div className="space-y-1.5 md:col-span-2 lg:col-span-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Representative Analysis</label>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Representative Analysis</label>
             <div>
               {isAdmin ? (
                 <select
