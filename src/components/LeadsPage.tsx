@@ -228,7 +228,15 @@ export const LeadsPage: React.FC = () => {
                   </td>
 
                   <td className="px-8 py-5">
-                    <div className="text-[13px] text-slate-500 font-medium">{lead.email || lead.phone || '—'}</div>
+                    <div className="flex flex-col gap-0.5">
+                      <div className="text-[13px] text-slate-600 font-semibold">{lead.email || '—'}</div>
+                      {lead.phone && (
+                        <div className="text-[11px] text-slate-400 font-medium flex items-center gap-1.5 mt-0.5">
+                          <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{lead.phone}</span>
+                        </div>
+                      )}
+                    </div>
                   </td>
 
                   <td className="px-8 py-5">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, serverTimestamp, doc, getDoc, getDocs } from 'firebase/firestore';
-import { X, User, Mail, Phone, BookOpen, Share2, Save, Tag } from 'lucide-react';
+import { collection, addDoc, serverTimestamp, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { X, User, Mail, Phone, BookOpen, Share2, Save, Tag, AlertTriangle } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { LeadStatus, OperationType, Course } from '../types';
 import { handleFirestoreError } from './AuthContext';
@@ -14,6 +14,7 @@ interface ManualLeadModalProps {
 
 export const ManualLeadModal: React.FC<ManualLeadModalProps> = ({ onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [customFieldsConfig, setCustomFieldsConfig] = useState<any[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [formData, setFormData] = useState({
@@ -69,7 +70,33 @@ export const ManualLeadModal: React.FC<ManualLeadModalProps> = ({ onClose, onSuc
     if (!formData.name.trim()) return;
 
     setLoading(true);
+    setError(null);
     try {
+      // Duplication Check against database
+      const trimmedEmail = formData.email?.trim();
+      const trimmedPhone = formData.phone?.trim();
+
+      if (trimmedEmail || trimmedPhone) {
+        const checkRef = collection(db, 'leads');
+        const dbChecks = [];
+        
+        if (trimmedEmail) {
+          dbChecks.push(getDocs(query(checkRef, where('email', '==', trimmedEmail))));
+        }
+        if (trimmedPhone) {
+          dbChecks.push(getDocs(query(checkRef, where('phone', '==', trimmedPhone))));
+        }
+
+        const querySnaps = await Promise.all(dbChecks);
+        const exists = querySnaps.some(snap => !snap.empty);
+
+        if (exists) {
+          setError("A lead with this email or phone number already exists.");
+          setLoading(false);
+          return;
+        }
+      }
+
       const score = calculateLeadScore({
          ...formData,
          customFields: customFieldValues
@@ -93,7 +120,8 @@ export const ManualLeadModal: React.FC<ManualLeadModalProps> = ({ onClose, onSuc
       
       onSuccess();
       onClose();
-    } catch (err) {
+    } catch (err: any) {
+      setError(err?.message || "Failed to register lead.");
       handleFirestoreError(err, OperationType.CREATE, 'leads');
     } finally {
       setLoading(false);
@@ -113,6 +141,12 @@ export const ManualLeadModal: React.FC<ManualLeadModalProps> = ({ onClose, onSuc
         </header>
 
         <form onSubmit={handleSubmit} className="px-10 pb-10 space-y-6 overflow-auto">
+          {error && (
+            <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-start gap-2.5 text-xs font-semibold text-rose-600 animate-slide-up">
+              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
           <div className="space-y-5">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</label>

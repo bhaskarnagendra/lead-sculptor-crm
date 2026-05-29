@@ -68,23 +68,52 @@ export const CalendarPage: React.FC = () => {
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
+  const mergeEventsByLead = (eventsList: FollowUp[]) => {
+    const merged: { [key: string]: FollowUp } = {};
+    eventsList.forEach(event => {
+      const leadKey = event.leadId || (event as any).parentLeadId || event.id;
+      if (!merged[leadKey]) {
+        merged[leadKey] = { ...event };
+      } else {
+        const existing = merged[leadKey];
+        if (event.note && existing.note !== event.note) {
+          existing.note = `${existing.note} | ${event.note}`;
+        }
+        const eventTs = event.scheduledAt?.toMillis() || 0;
+        const existingTs = existing.scheduledAt?.toMillis() || 0;
+        if (eventTs < existingTs) {
+          existing.scheduledAt = event.scheduledAt;
+        }
+        if (event.type === 'meeting' || existing.type === 'meeting') {
+          existing.type = 'meeting';
+        } else if (event.type === 'call' || existing.type === 'call') {
+          existing.type = 'call';
+        }
+      }
+    });
+    return Object.values(merged);
+  };
+
   const getDayEvents = (day: number) => {
-    return events.filter(event => {
+    const rawEvents = events.filter(event => {
       if (!event.scheduledAt) return false;
       const eventDate = event.scheduledAt.toDate();
       return eventDate.getDate() === day &&
              eventDate.getMonth() === currentDate.getMonth() &&
              eventDate.getFullYear() === currentDate.getFullYear();
     });
+    return mergeEventsByLead(rawEvents);
   };
 
-  const selectedDayEvents = selectedDate ? events.filter(event => {
-    if (!event.scheduledAt) return false;
-    const eventDate = event.scheduledAt.toDate();
-    return eventDate.getDate() === selectedDate.getDate() &&
-           eventDate.getMonth() === selectedDate.getMonth() &&
-           eventDate.getFullYear() === selectedDate.getFullYear();
-  }).sort((a,b) => (a.scheduledAt?.toMillis() || 0) - (b.scheduledAt?.toMillis() || 0)) : [];
+  const selectedDayEvents = selectedDate ? mergeEventsByLead(
+    events.filter(event => {
+      if (!event.scheduledAt) return false;
+      const eventDate = event.scheduledAt.toDate();
+      return eventDate.getDate() === selectedDate.getDate() &&
+             eventDate.getMonth() === selectedDate.getMonth() &&
+             eventDate.getFullYear() === selectedDate.getFullYear();
+    })
+  ).sort((a,b) => (a.scheduledAt?.toMillis() || 0) - (b.scheduledAt?.toMillis() || 0)) : [];
 
   return (
     <div className="h-full flex flex-col bg-[#FBFBFC]">

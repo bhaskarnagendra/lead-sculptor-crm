@@ -124,7 +124,24 @@ export const Dashboard: React.FC = () => {
       setTasks(allPending);
       
       const callTasks = allPending.filter((t: any) => t.type === 'call');
-      setCalls(callTasks);
+      // Deduplicate calls by lead ID so the same lead is not dialed multiple times
+      const uniqueCallsMap = new Map<string, any>();
+      callTasks.forEach((c: any) => {
+        const leadId = c.parentLeadId || c.leadId || c.id;
+        if (!uniqueCallsMap.has(leadId)) {
+          uniqueCallsMap.set(leadId, c);
+        } else {
+          const existing = uniqueCallsMap.get(leadId);
+          if (c.scheduledAt && existing.scheduledAt) {
+            const cMs = c.scheduledAt.toMillis ? c.scheduledAt.toMillis() : new Date(c.scheduledAt).getTime();
+            const exMs = existing.scheduledAt.toMillis ? existing.scheduledAt.toMillis() : new Date(existing.scheduledAt).getTime();
+            if (cMs < exMs) {
+              uniqueCallsMap.set(leadId, c);
+            }
+          }
+        }
+      });
+      setCalls(Array.from(uniqueCallsMap.values()));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'followups_group');
     });
@@ -1215,8 +1232,10 @@ export const Dashboard: React.FC = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {(() => {
-            const priorityCalls = calls.slice(0, 3).map(c => ({
+            // Map all calls
+            const priorityCalls = calls.map(c => ({
               id: c.id,
+              leadId: c.parentLeadId || c.leadId || '',
               name: c.leadName || 'Unnamed Prospect',
               status: 'Urgent Callback',
               score: 90,
@@ -1224,11 +1243,12 @@ export const Dashboard: React.FC = () => {
               color: 'text-amber-600 bg-amber-50 border-amber-200'
             }));
 
+            // Map all hot/new leads
             const hotNewLeads = leads
               .filter(l => l.status === 'new' || (l.score > 80 && l.status !== 'enrolled'))
-              .slice(0, 3)
               .map(l => ({
                 id: l.id,
+                leadId: l.id,
                 name: l.name,
                 status: `Hot Intake (Score: ${l.score})`,
                 score: l.score,
@@ -1236,7 +1256,30 @@ export const Dashboard: React.FC = () => {
                 color: 'text-indigo-600 bg-indigo-50 border-indigo-200'
               }));
             
-            const listToDisplay = [...priorityCalls, ...hotNewLeads].slice(0, 3);
+            // Deduplicate lists by leadId
+            const seenActiveLeads = new Set<string>();
+            const uniqueQueueList: any[] = [];
+
+            [...priorityCalls, ...hotNewLeads].forEach(item => {
+              const lid = item.leadId;
+              if (lid && seenActiveLeads.has(lid)) {
+                // If this lead is already in list, merge and prioritize 'Follow-up Needed'
+                const existingIndex = uniqueQueueList.findIndex(x => x.leadId === lid);
+                if (existingIndex !== -1 && item.badge === 'Follow-up Needed') {
+                  uniqueQueueList[existingIndex] = {
+                    ...uniqueQueueList[existingIndex],
+                    badge: 'Follow-up Needed',
+                    color: 'text-amber-600 bg-amber-50 border-amber-200',
+                    status: 'Urgent Callback'
+                  };
+                }
+                return;
+              }
+              if (lid) seenActiveLeads.add(lid);
+              uniqueQueueList.push(item);
+            });
+
+            const listToDisplay = uniqueQueueList.slice(0, 3);
             
             if (listToDisplay.length === 0) {
               return (

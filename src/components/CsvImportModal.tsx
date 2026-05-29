@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import { X, Upload, CheckCircle2, AlertCircle, Clipboard, FileSpreadsheet, ArrowRight, Check, ListFilter, Users, Tag } from 'lucide-react';
 import { collection, writeBatch, doc, serverTimestamp, getDocs, getDoc, query, where, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { handleFirestoreError } from './AuthContext';
+import { handleFirestoreError, useAuth } from './AuthContext';
 import { OperationType, Course, LeadStatus } from '../types';
 import { calculateLeadScore } from '../utils/LeadScoring';
 
@@ -13,10 +13,12 @@ interface CsvImportModalProps {
 }
 
 export const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onSuccess }) => {
+  const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState<'paste' | 'file'>('paste');
   const [pasteText, setPasteText] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [step, setStep] = useState<1 | 2>(1); // Step 1: Input & Settings, Step 2: Mapping & Preview
+  const [lastAssignmentIndex, setLastAssignmentIndex] = useState<number>(0);
   
   // Settings
   const [defaultSource, setDefaultSource] = useState('Meta');
@@ -50,17 +52,38 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onSucce
     const fetchTeamAndCourses = async () => {
       try {
         const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('role', 'in', ['sales_rep', 'admin']));
-        const userSnap = await getDocs(q);
+        const userSnap = await getDocs(usersRef);
         const fetchedTeam = userSnap.docs.map(d => ({
           uid: d.id,
-          displayName: d.data().displayName || 'Unknown',
+          displayName: d.data().displayName || d.data().email?.split('@')[0] || 'Agent',
           email: d.data().email || '',
+          role: d.data().role || '',
           receiveRoundRobin: d.data().receiveRoundRobin !== false
-        })).sort((a, b) => a.uid.localeCompare(b.uid));
+        })).filter(member => {
+          const nameClean = (member.displayName || '').trim().toLowerCase();
+          const hasValidRole = member.role === 'sales_rep' || member.role === 'admin' || !member.role;
+          return nameClean && nameClean !== 'unnamed' && nameClean !== 'unknown' && hasValidRole;
+        }).sort((a, b) => a.uid.localeCompare(b.uid));
+
+        if (fetchedTeam.length === 0 && profile) {
+          fetchedTeam.push({
+            uid: profile.uid,
+            displayName: profile.displayName || profile.email?.split('@')[0] || 'Me',
+            email: profile.email || '',
+            role: profile.role || 'admin',
+            receiveRoundRobin: true
+          });
+        }
+
         setTeam(fetchedTeam);
         if (fetchedTeam.length > 0) {
           setSelectedOwnerUid(fetchedTeam[0].uid);
+        }
+
+        const configRef = doc(db, 'config', 'assignment');
+        const configSnap = await getDoc(configRef);
+        if (configSnap.exists()) {
+          setLastAssignmentIndex(configSnap.data().lastIndex || 0);
         }
 
         const coursesRef = collection(db, 'courses');
@@ -71,7 +94,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onSucce
       }
     };
     fetchTeamAndCourses();
-  }, []);
+  }, [profile]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -198,20 +221,51 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onSucce
     }
   };
 
+  const [importSummary, setImportSummary] = useState<{ saved: number; skipped: number } | null>(null);
+
   // Helper to match pasted/Excel owner string into real Firestore user profile
   const findTeamMember = (pastedName: string) => {
     if (!pastedName) return null;
     const normalized = pastedName.toLowerCase().trim();
+    
     // 1. Check exact display name
     let found = team.find(t => t.displayName.toLowerCase().trim() === normalized);
-    if (!found) {
-      // 2. Check contains / partial matches
-      found = team.find(t => t.displayName.toLowerCase().includes(normalized) || normalized.includes(t.displayName.toLowerCase()));
-    }
-    if (!found) {
-      // 3. Check username fragment of email (e.g. bhaskarnagendra from email)
-      found = team.find(t => t.email.toLowerCase().split('@')[0] === normalized);
-    }
+    if (found) return found;
+
+    // 2. Exact match of first word (e.g. "Arpitha R" matches "Arpita")
+    const firstWord = normalized.split(/\s+/)[0];
+    found = team.find(t => {
+      const dbName = t.displayName.toLowerCase().trim();
+      const dbFirstWord = dbName.split(/\s+/)[0];
+      return dbFirstWord === firstWord || 
+             dbName.includes(firstWord) || 
+             firstWord.includes(dbName);
+    });
+    if (found) return found;
+
+    // 3. Spelling-tolerant check for Monish/Arpita/Arpitha etc (prefix/substring or character overlap)
+    const stripped = normalized.replace(/[^a-z]/g, '');
+    found = team.find(t => {
+      const dbStripped = t.displayName.toLowerCase().trim().replace(/[^a-z]/g, '');
+      if (dbStripped === stripped) return true;
+      if (dbStripped.startsWith(stripped) || stripped.startsWith(dbStripped)) return true;
+      
+      // Check 75%+ character overlap for edits/typos
+      if (Math.abs(dbStripped.length - stripped.length) <= 3) {
+        let matches = 0;
+        for (const char of dbStripped) {
+          if (stripped.includes(char)) matches++;
+        }
+        if (matches / Math.max(dbStripped.length, stripped.length) >= 0.70) {
+          return true;
+        }
+      }
+      return false;
+    });
+    if (found) return found;
+
+    // 4. Check email
+    found = team.find(t => t.email.toLowerCase().includes(normalized) || normalized.includes(t.email.toLowerCase().split('@')[0]));
     return found;
   };
 
@@ -240,12 +294,27 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onSucce
     if (!mapping.name) return [];
 
     // Track state to calculate local Assignment Round Robin sequence
-    let roundRobinIdx = 0;
+    let roundRobinIdx = lastAssignmentIndex;
+    const seenEmails = new Set<string>();
+    const seenPhones = new Set<string>();
 
-    return rawRows.map((row) => {
+    const mappedList: any[] = [];
+
+    rawRows.forEach((row) => {
       const name = row[mapping.name] || 'Unknown';
-      const email = mapping.email ? row[mapping.email] || '' : '';
-      const phone = mapping.phone ? row[mapping.phone] || '' : '';
+      const email = mapping.email ? (row[mapping.email] || '').trim() : '';
+      const phone = mapping.phone ? (row[mapping.phone] || '').trim().replace(/\s+/g, '') : '';
+
+      const normalizedEmail = email.toLowerCase();
+      const normalizedPhone = phone.replace(/[^0-9]/g, '');
+
+      // Duplicate within the file itself check:
+      if (normalizedEmail && seenEmails.has(normalizedEmail)) return;
+      if (normalizedPhone && seenPhones.has(normalizedPhone)) return;
+
+      if (normalizedEmail) seenEmails.add(normalizedEmail);
+      if (normalizedPhone) seenPhones.add(normalizedPhone);
+
       const source = getOutputSource(row);
       const rawStatusStr = mapping.status ? row[mapping.status] : '';
       const status = normalizeStatus(rawStatusStr);
@@ -278,7 +347,18 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onSucce
           assignedName = selectedRep.displayName;
         }
       } else if (assignmentStrategy === 'round_robin') {
-        const activeReps = team.filter(t => t.receiveRoundRobin !== false && t.email?.toLowerCase().trim() !== 'bhaskarnagendra@gmail.com');
+        let activeReps = team.filter(t => t.receiveRoundRobin !== false && t.email?.toLowerCase().trim() !== 'bhaskarnagendra@gmail.com');
+        if (activeReps.length === 0) {
+          activeReps = team;
+        }
+        if (activeReps.length === 0 && profile) {
+          activeReps = [{
+            uid: profile.uid,
+            displayName: profile.displayName || profile.email?.split('@')[0] || 'Me',
+            email: profile.email || '',
+            receiveRoundRobin: true
+          }];
+        }
         if (activeReps.length > 0) {
           const rep = activeReps[roundRobinIdx % activeReps.length];
           assignedTo = rep.uid;
@@ -292,6 +372,39 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onSucce
         if (matchedOwner) {
           assignedTo = matchedOwner.uid;
           assignedName = matchedOwner.displayName;
+        } else {
+          // Robust Fallback: instead of letting unmapped or empty owner rows stay completely unassigned,
+          // assign via sequential round-robin to keep queue fully active and balanced
+          let activeReps = team.filter(t => t.receiveRoundRobin !== false && t.email?.toLowerCase().trim() !== 'bhaskarnagendra@gmail.com');
+          if (activeReps.length === 0) {
+            activeReps = team;
+          }
+          if (activeReps.length === 0 && profile) {
+            activeReps = [{
+              uid: profile.uid,
+              displayName: profile.displayName || profile.email?.split('@')[0] || 'Me',
+              email: profile.email || '',
+              receiveRoundRobin: true
+            }];
+          }
+          if (activeReps.length > 0) {
+            const rep = activeReps[roundRobinIdx % activeReps.length];
+            assignedTo = rep.uid;
+            assignedName = rep.displayName;
+            roundRobinIdx = (roundRobinIdx + 1) % activeReps.length;
+          }
+        }
+      }
+
+      // If still not assigned to anyone (e.g., empty team list and no authenticated profile loaded yet)
+      // assign to current user profile or standard first user of team as absolute fail-safe
+      if (!assignedTo) {
+        if (profile) {
+          assignedTo = profile.uid;
+          assignedName = profile.displayName || profile.email?.split('@')[0] || 'Me';
+        } else if (team.length > 0) {
+          assignedTo = team[0].uid;
+          assignedName = team[0].displayName;
         }
       }
 
@@ -313,7 +426,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onSucce
 
       const score = calculateLeadScore({ name, email, phone, status, courseName, customFields });
 
-      return {
+      mappedList.push({
         name,
         email,
         phone,
@@ -325,8 +438,10 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onSucce
         assignedTo: assignedTo || null,
         assignedName: assignedName || null,
         customFields,
-      };
+      });
     });
+
+    return mappedList;
   };
 
   const handleRunImport = async () => {
@@ -336,11 +451,34 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onSucce
     try {
       let currentBatch = writeBatch(db);
       const leadsRef = collection(db, 'leads');
-      const leadsToSave = generateMappedLeads();
+      const leadsToSave = generateMappedLeads(); // Keeps only sheet-unique leads
+
+      // Fetch all existing leads from DB to check for duplicates
+      const dbLeadsSnap = await getDocs(leadsRef);
+      const dbEmails = new Set<string>();
+      const dbPhones = new Set<string>();
+
+      dbLeadsSnap.docs.forEach(doc => {
+        const d = doc.data();
+        if (d.email) dbEmails.add(String(d.email).trim().toLowerCase());
+        if (d.phone) dbPhones.add(String(d.phone).trim().replace(/\s+/g, ''));
+      });
+
+      let saveCount = 0;
+      let duplicateSkipCount = 0;
 
       // Chunk Firestore batches if exceeds 500
       let chunkCount = 0;
       for (const lead of leadsToSave) {
+        const normEmail = lead.email ? lead.email.trim().toLowerCase() : '';
+        const normPhone = lead.phone ? lead.phone.trim().replace(/\s+/g, '') : '';
+
+        // If exists in DB, skip!
+        if ((normEmail && dbEmails.has(normEmail)) || (normPhone && dbPhones.has(normPhone))) {
+          duplicateSkipCount++;
+          continue;
+        }
+
         const leadDoc = doc(leadsRef);
         currentBatch.set(leadDoc, {
           ...lead,
@@ -348,6 +486,11 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onSucce
           updatedAt: serverTimestamp(),
         });
 
+        // Add to our DB sets in memory so that subsequent rows in this same queue matching this are also skipped
+        if (normEmail) dbEmails.add(normEmail);
+        if (normPhone) dbPhones.add(normPhone);
+
+        saveCount++;
         chunkCount++;
         if (chunkCount >= 450) {
           await currentBatch.commit();
@@ -360,15 +503,19 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onSucce
         await currentBatch.commit();
       }
 
-      // Sync the latest assignment index back if we did round-robin
-      if (assignmentStrategy === 'round_robin' && team.length > 0) {
-        const finalIndex = (leadsToSave.length) % team.length;
+      // Sync the latest assignment index back if we did round-robin or mapped with fallback to round-robin
+      let activeReps = team.filter(t => t.receiveRoundRobin !== false && t.email?.toLowerCase().trim() !== 'bhaskarnagendra@gmail.com');
+      if (activeReps.length === 0) {
+        activeReps = team;
+      }
+      if (activeReps.length > 0) {
+        const finalIndex = (lastAssignmentIndex + saveCount) % activeReps.length;
         const configRef = doc(db, 'config', 'assignment');
         await setDoc(configRef, { lastIndex: finalIndex }, { merge: true });
+        setLastAssignmentIndex(finalIndex);
       }
 
-      onSuccess();
-      onClose();
+      setImportSummary({ saved: saveCount, skipped: duplicateSkipCount });
     } catch (err: any) {
       console.error("Bulk Import Error Details:", err);
       setError(err?.message || "Import failed. Check your network or permissions.");
