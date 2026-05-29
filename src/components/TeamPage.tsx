@@ -11,7 +11,7 @@ export const TeamPage: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [memberToDelete, setMemberToDelete] = useState<UserProfile | null>(null);
-  const [newUser, setNewUser] = useState({ email: '', displayName: '', password: '' });
+  const [newUser, setNewUser] = useState({ email: '', displayName: '', password: '', role: 'sales_rep' as UserRole });
   const [editForm, setEditForm] = useState({ email: '', displayName: '', password: '' });
   const [error, setError] = useState<string | null>(null);
   const { profile, isAdmin } = useAuth();
@@ -121,12 +121,41 @@ export const TeamPage: React.FC = () => {
     const unsubscribe = onSnapshot(usersRef, (snapshot) => {
       const allDocs = snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile));
       
-      const filteredDocs = allDocs.filter(member => {
-        const nameClean = (member.displayName || '').trim().toLowerCase();
-        return nameClean && nameClean !== 'unnamed' && nameClean !== 'unknown';
-      });
+      const uniqueDocs: UserProfile[] = [];
+      const seenNames = new Set<string>();
+      const seenEmails = new Set<string>();
+      
+      for (const u of allDocs) {
+        const nameClean = (u.displayName || '').trim().toLowerCase();
+        const emailClean = (u.email || '').trim().toLowerCase();
+        
+        if (!nameClean || nameClean === 'unnamed' || nameClean === 'unknown') {
+          continue;
+        }
+        
+        const isMasterMonish = u.uid === 'manual_sales_1';
+        const isMasterArpita = u.uid === 'manual_sales_2';
+        
+        const isMonishName = nameClean === 'monish' || emailClean.startsWith('monish');
+        const isArpitaName = nameClean === 'arpita' || nameClean === 'arpitha' || emailClean.startsWith('arpita') || emailClean.startsWith('arpitha');
+        
+        if (isMonishName && !isMasterMonish && allDocs.some(other => other.uid === 'manual_sales_1')) {
+          continue;
+        }
+        if (isArpitaName && !isMasterArpita && allDocs.some(other => other.uid === 'manual_sales_2')) {
+          continue;
+        }
+        
+        if ((seenNames.has(nameClean) || (emailClean && seenEmails.has(emailClean))) && u.uid !== 'manual_sales_1' && u.uid !== 'manual_sales_2') {
+          continue;
+        }
+        
+        seenNames.add(nameClean);
+        if (emailClean) seenEmails.add(emailClean);
+        uniqueDocs.push(u);
+      }
 
-      setTeam(filteredDocs);
+      setTeam(uniqueDocs);
       setLoading(false);
     }, (err) => {
       console.error("Failed to load team:", err);
@@ -161,7 +190,7 @@ export const TeamPage: React.FC = () => {
         uid: `manual_${Date.now()}`,
         email: newUser.email,
         displayName: newUser.displayName,
-        role: 'sales_rep',
+        role: newUser.role || 'sales_rep',
         createdAt: serverTimestamp(),
       };
       
@@ -169,7 +198,7 @@ export const TeamPage: React.FC = () => {
       await setDoc(userDocRef, { ...newProfile, password: newUser.password });
       
       setIsAddModalOpen(false);
-      setNewUser({ email: '', displayName: '', password: '' });
+      setNewUser({ email: '', displayName: '', password: '', role: 'sales_rep' });
     } catch (err: any) {
       console.error("Create user error:", err);
       setError(err?.message || "Failed to create new account profile.");
@@ -302,10 +331,26 @@ export const TeamPage: React.FC = () => {
                       placeholder="••••••••"
                       className="minimal-input pr-12"
                     />
-                    <button className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-300 hover:text-indigo-600">
+                    <button 
+                      type="button"
+                      onClick={() => setNewUser({ ...newUser, password: generateRandomPassword() })}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-300 hover:text-indigo-600 transition-colors"
+                      title="Generate Password"
+                    >
                       <RefreshCw size={14} />
                     </button>
                   </div>
+               </div>
+               <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Role</label>
+                  <select 
+                    value={newUser.role}
+                    onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})}
+                    className="minimal-input bg-slate-100/50 cursor-pointer"
+                  >
+                    <option value="sales_rep">Sales Representative</option>
+                    <option value="admin">Administrator Privilege</option>
+                  </select>
                </div>
              </div>
 

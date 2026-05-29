@@ -94,7 +94,41 @@ export const Dashboard: React.FC = () => {
     let unsubscribeTeam = () => {};
     if (isAdmin) {
       unsubscribeTeam = onSnapshot(collection(db, 'users'), (snapshot) => {
-        setTeam(snapshot.docs.map(d => ({ uid: d.id, ...d.data() })));
+        const rawUsers = snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as any));
+        const uniqueUsers: any[] = [];
+        const seenNames = new Set<string>();
+        const seenEmails = new Set<string>();
+        
+        for (const u of rawUsers) {
+          const nameClean = (u.displayName || '').trim().toLowerCase();
+          const emailClean = (u.email || '').trim().toLowerCase();
+          
+          if (!nameClean || nameClean === 'unnamed' || nameClean === 'unknown') {
+            continue;
+          }
+          
+          const isMasterMonish = u.uid === 'manual_sales_1';
+          const isMasterArpita = u.uid === 'manual_sales_2';
+          
+          const isMonishName = nameClean === 'monish' || emailClean.startsWith('monish');
+          const isArpitaName = nameClean === 'arpita' || nameClean === 'arpitha' || emailClean.startsWith('arpita') || emailClean.startsWith('arpitha');
+          
+          if (isMonishName && !isMasterMonish && rawUsers.some(other => other.uid === 'manual_sales_1')) {
+            continue;
+          }
+          if (isArpitaName && !isMasterArpita && rawUsers.some(other => other.uid === 'manual_sales_2')) {
+            continue;
+          }
+          
+          if ((seenNames.has(nameClean) || (emailClean && seenEmails.has(emailClean))) && u.uid !== 'manual_sales_1' && u.uid !== 'manual_sales_2') {
+            continue;
+          }
+          
+          seenNames.add(nameClean);
+          if (emailClean) seenEmails.add(emailClean);
+          uniqueUsers.push(u);
+        }
+        setTeam(uniqueUsers);
       }, (err) => {
         console.error("Dashboard team listener failed:", err);
       });

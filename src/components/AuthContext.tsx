@@ -47,13 +47,32 @@ export async function seedUsersIfEmpty() {
     await deleteDoc(adminRef1);
     await deleteDoc(adminRef2);
 
-    // Query all users and delete any whose role is 'admin' but email is not the owner email
+    // Query all users and clean up duplicate representatives or legacy entries.
+    // Do NOT delete non-owner admin users that were explicitly created/updated by the user.
     const usersSnap = await getDocs(collection(db, 'users'));
     for (const d of usersSnap.docs) {
       const u = d.data();
-      if (u.role === 'admin' && u.email !== 'bhaskarnagendra@gmail.com') {
-        console.log("Deleting non-owner admin user:", d.id, u.email);
+      const emailLower = (u.email || '').trim().toLowerCase();
+      
+      // Clean up manually created copies of Monish or Arpita to keep only the seeded master ones
+      const nameLower = (u.displayName || '').trim().toLowerCase();
+      const isMonish = emailLower === 'monish@leadsculptor.com' || nameLower === 'monish' || emailLower === 'monish';
+      const isArpita = emailLower === 'arpita@leadsculptor.com' || nameLower === 'arpita' || nameLower === 'arpitha' || emailLower === 'arpita' || emailLower === 'arpitha';
+      
+      if (isMonish && d.id !== 'manual_sales_1') {
+        console.log("Cleaning up duplicate Monish profile:", d.id);
         await deleteDoc(doc(db, 'users', d.id));
+      } else if (isArpita && d.id !== 'manual_sales_2') {
+        console.log("Cleaning up duplicate Arpita profile:", d.id);
+        await deleteDoc(doc(db, 'users', d.id));
+      } else if (d.id.startsWith('manual_') && d.id !== 'manual_sales_1' && d.id !== 'manual_sales_2') {
+        // Clean up empty, unnamed, or corrupted manual profiles that cause counting anomalies
+        const nameClean = (u.displayName || '').trim().toLowerCase();
+        const emailClean = (u.email || '').trim().toLowerCase();
+        if (!nameClean || nameClean === 'unnamed' || nameClean === 'unknown' || !emailClean) {
+          console.log("Cleaning up invalid/corrupted manual user profile:", d.id);
+          await deleteDoc(doc(db, 'users', d.id));
+        }
       }
     }
 
