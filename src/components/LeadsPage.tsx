@@ -96,9 +96,12 @@ export const LeadsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const filteredLeads = leads.filter(l => {
-    const matchesSearch = l.name.toLowerCase().includes(search.toLowerCase()) ||
-      l.email.toLowerCase().includes(search.toLowerCase()) ||
-      l.phone.toLowerCase().includes(search.toLowerCase());
+    const nameStr = l.name || '';
+    const emailStr = l.email || '';
+    const phoneStr = l.phone || '';
+    const matchesSearch = nameStr.toLowerCase().includes(search.toLowerCase()) ||
+      emailStr.toLowerCase().includes(search.toLowerCase()) ||
+      phoneStr.toLowerCase().includes(search.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || l.status === statusFilter;
     
@@ -200,7 +203,9 @@ export const LeadsPage: React.FC = () => {
             <thead>
               <tr className="border-b border-slate-100">
                 <th className="px-8 py-4 data-grid-header">Prospect</th>
-                <th className="px-8 py-4 data-grid-header">Contact</th>
+                <th className="px-8 py-4 data-grid-header">Email</th>
+                <th className="px-8 py-4 data-grid-header">Phone</th>
+                <th className="px-8 py-4 data-grid-header">Course</th>
                 <th className="px-8 py-4 data-grid-header">Owner</th>
                 <th className="px-8 py-4 data-grid-header">Follow Up</th>
                 <th className="px-8 py-4 data-grid-header">Status</th>
@@ -228,15 +233,22 @@ export const LeadsPage: React.FC = () => {
                   </td>
 
                   <td className="px-8 py-5">
-                    <div className="flex flex-col gap-0.5">
-                      <div className="text-[13px] text-slate-600 font-semibold">{lead.email || '—'}</div>
-                      {lead.phone && (
-                        <div className="text-[11px] text-slate-400 font-medium flex items-center gap-1.5 mt-0.5">
-                          <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{lead.phone}</span>
-                        </div>
-                      )}
-                    </div>
+                    <div className="text-[13px] text-slate-600 font-semibold">{lead.email || '—'}</div>
+                  </td>
+
+                  <td className="px-8 py-5">
+                    {lead.phone ? (
+                      <div className="text-[13px] text-slate-600 font-semibold flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>{lead.phone}</span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
+                  </td>
+
+                  <td className="px-8 py-5">
+                    <div className="text-[13px] text-slate-600 font-semibold">{lead.courseName || '—'}</div>
                   </td>
 
                   <td className="px-8 py-5">

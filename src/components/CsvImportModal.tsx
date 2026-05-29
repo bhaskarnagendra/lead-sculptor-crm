@@ -150,20 +150,92 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onSucce
     
     detectedHeaders.forEach(h => {
       const lower = h.toLowerCase().trim();
-      if (lower === 'name' || lower === 'full name' || lower === 'prospect name' || lower === 'prospect' || lower === 'student name') {
-        newMapping.name = h;
-      } else if (lower === 'email' || lower === 'mail' || lower === 'email address') {
-        newMapping.email = h;
-      } else if (lower === 'phone' || lower === 'phone number' || lower === 'mobile' || lower === 'contact' || lower === 'number') {
-        newMapping.phone = h;
-      } else if (lower === 'course' || lower === 'course name' || lower === 'program' || lower === 'class' || lower === 'courseName') {
-        newMapping.courseName = h;
-      } else if (lower === 'status' || lower === 'stage' || lower === 'lead status' || lower === 'leadstatus') {
-        newMapping.status = h;
-      } else if (lower === 'owner' || lower === 'assigned' || lower === 'sales' || lower === 'rep' || lower === 'owner name' || lower === 'assignee') {
-        newMapping.owner = h;
-      } else if (lower === 'source' || lower === 'medium' || lower === 'campaign' || lower === 'lead source') {
-        newMapping.source = h;
+      
+      // Name Matcher
+      if (
+        lower === 'name' || 
+        lower.includes('full name') || 
+        lower.includes('prospect name') || 
+        lower === 'prospect' || 
+        lower.includes('student name') ||
+        lower.includes('first name') ||
+        lower.includes('lead name')
+      ) {
+        if (!newMapping.name) newMapping.name = h;
+      }
+      
+      // Email Matcher
+      if (
+        lower.includes('email') || 
+        lower === 'mail' || 
+        lower.includes('email id') || 
+        lower.includes('email address') ||
+        lower.includes('emailid')
+      ) {
+        if (!newMapping.email) newMapping.email = h;
+      }
+      
+      // Phone Matcher
+      if (
+        lower.includes('phone') || 
+        lower.includes('mobile') || 
+        lower.includes('contact') || 
+        lower.includes('tel') || 
+        lower.includes('cell') || 
+        lower === 'number' || 
+        lower === 'no' || 
+        lower.includes('whatsapp')
+      ) {
+        // Avoid matching serial numbers or courses
+        if (!lower.includes('serial') && !lower.includes('roll') && !lower.includes('course') && !lower.includes('id') && !lower.includes('fee')) {
+          if (!newMapping.phone) newMapping.phone = h;
+        }
+      }
+      
+      // Course Matcher
+      if (
+        lower.includes('course') || 
+        lower.includes('program') || 
+        lower.includes('class') || 
+        lower.includes('specialization') ||
+        lower.includes('subject')
+      ) {
+        if (!newMapping.courseName) newMapping.courseName = h;
+      }
+      
+      // Status Matcher
+      if (
+        lower === 'status' || 
+        lower === 'stage' || 
+        lower.includes('lead status') || 
+        lower.includes('pipeline') ||
+        lower.includes('sub status') ||
+        lower.includes('main status')
+      ) {
+        if (!newMapping.status) newMapping.status = h;
+      }
+      
+      // Owner Matcher
+      if (
+        lower.includes('owner') || 
+        lower.includes('assigned') || 
+        lower.includes('sales') || 
+        lower.includes('rep') || 
+        lower.includes('assignee') ||
+        lower.includes('agent')
+      ) {
+        if (!newMapping.owner) newMapping.owner = h;
+      }
+      
+      // Source Matcher
+      if (
+        lower.includes('source') || 
+        lower.includes('medium') || 
+        lower.includes('campaign') || 
+        lower.includes('channel') ||
+        lower.includes('utm')
+      ) {
+        if (!newMapping.source) newMapping.source = h;
       }
     });
 
@@ -171,7 +243,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onSucce
     if (!newMapping.name && detectedHeaders.length > 0) newMapping.name = detectedHeaders[0];
     if (!newMapping.phone && detectedHeaders.length > 1) {
       const remaining = detectedHeaders.filter(h => h !== newMapping.name);
-      const possiblePhone = remaining.find(h => /phone|number|contact/i.test(h));
+      const possiblePhone = remaining.find(h => /phone|number|contact|tel|cell|mobile/i.test(h));
       if (possiblePhone) newMapping.phone = possiblePhone;
     }
 
